@@ -1,0 +1,7 @@
+#!/bin/bash
+if [[ "$1" = "pi" ]]; then
+  sudo python3 src/raspberry-pi/Portahorn
+elif [[ "$1" = "app" ]]; then
+  cd src/android
+  sudo python3 main.py
+fi

@@ -1,49 +1,79 @@
+from threading import Thread
+
 from kivy.app import App
 from kivy.core.audio import SoundLoader
 from kivy.clock import Clock
+from kivy.uix.button import Button
 
 from bluetooth import *
 
-from Application import Application
+notes = [
+[ SoundLoader.load("res/sounds/a.wav"), SoundLoader.load("res/sounds/a.wav") ],
+[ SoundLoader.load("res/sounds/b.wav"), SoundLoader.load("res/sounds/b.wav") ],
+[ SoundLoader.load("res/sounds/c.wav"), SoundLoader.load("res/sounds/c.wav") ],
+[ SoundLoader.load("res/sounds/d.wav"), SoundLoader.load("res/sounds/d.wav") ],
+[ SoundLoader.load("res/sounds/e.wav"), SoundLoader.load("res/sounds/e.wav") ],
+[ SoundLoader.load("res/sounds/f.wav"), SoundLoader.load("res/sounds/f.wav") ],
+[ SoundLoader.load("res/sounds/g.wav"), SoundLoader.load("res/sounds/g.wav") ]
+]
 
-pressed_buttons = set()
-# NOTE_A = SoundLoader.load("a.wav")
-# NOTE_A = SoundLoader.load("a.wav")
-# NOTE_A = SoundLoader.load("a.wav")
-# NOTE_A = SoundLoader.load("a.wav")
-# NOTE_A = SoundLoader.load("a.wav")
-# NOTE_A = SoundLoader.load("a.wav")
-# NOTE_A = SoundLoader.load("a.wav")
-notes = { 'a':set([0,1]),'b':set([0]),'c':set([1]),'d':set([0,1,2,3,4,5,6]), 'e':set([0,1,2,3,4,5]), 'f':set([0,1,2,3,4]), 'g':set([0,1,2,3]) }
+def PlayNote(notes):
+    global first_sound
+    global last_notes
+    last_notes = notes
+    if notes is None and last_notes is not None:
+        if first_sound:
+            last_notes[1].stop()
+        else:
+            last_notes[0].stop()
 
-def Start(dt):
-    devices=find_bluetooth()
-    for addr, name in devices:
-        print("%s - %s" % (addr, name))
-
-    if(len(devices) == 1):
-        portahorn.sock = BluetoothSocket( RFCOMM )
-        portahorn.sock.connect((devices[0]["host"], devices[0]["port"]))
-        Clock.schedule_interval(lambda dt: get_button(), 1.0/30.0)
-        Clock.schedule_interval(lambda dt: play_sound(), 1.0/10.0)
-
-def play_sound():
-    global last_note
-    note = get_note()
-
-    if note is not last_note:
-        print(note)
-
-    last_note = note
+    if first_sound:
+        first_sound = False
+        notes[0].play()
+    else:
+        first_sound = True
+        notes[1].play()
 
 def get_note():
-    for key, value in notes:
-        if pressed_buttons is value:
-            return key
-    return None
+    if set([2]) is pressed_buttons:
+        return notes[2] # C
+    elif set([1]) is pressed_buttons:
+        return notes[1] # B
+    elif set([1, 2]) is pressed_buttons:
+        return notes[0] # A
+    elif set([1, 2, 3]) is pressed_buttons:
+        return notes[6] # G
+    elif set([1, 2, 3, 4]) is pressed_buttons:
+        return notes[5] # F
+    elif set([1, 2, 3, 4, 5]) is pressed_buttons:
+        return notes[4] # E
+    elif set([1, 2, 3, 4, 5, 6]) is pressed_buttons:
+        return notes[3] # D
+
+def find_bluetooth():
+    # The uuid of the raspberry pi
+    uuid="a7317d48-cf0f-4b8c-8899-c2b9184964ea"
+    print("Finding a Portahorn near you...")
+
+    service_matches = find_service( uuid = uuid )
+
+
+    if len(service_matches) == 0:
+        print("Unable to find a Portahorn!")
+        exit(0)
+
+    print("Found a Portahorn!")
+
+    # Use the first one found
+    device = service_matches[0]
+    sock = BluetoothSocket( RFCOMM )
+    sock.connect((device["host"], devices["port"]))
+    print("Sucessfully Connected!")
+    if not shutdown:
+        Clock.schedule_once(lambda dt: MainApplication.loop_t.start(), 0.1)
 
 def get_button():
-    data = portahorn.sock.recv(1024)
+    data = sock.recv(1024)
     data = data.split("_")
     button = data[0]
     on = (data[1] == 1)
@@ -54,28 +84,35 @@ def get_button():
         if button in pressed_buttons:
             pressed_buttons.remove(button)
 
+# The main loop of the application
+def looper():
+    loop_started = True
+    Clock.schedule_interval(PlayNote(get_note()), 1)
+    while (not shutdown):
+        get_button()
+
 class PortahornApp(App):
-    def build(self):
-        Clock.schedule_once(Start, 1.0)
-        self.application = Application()
-        return None
+    # Will be called when the application starts running
+    def on_start(self):
+        self.find_bt_t = Thread(target=find_bluetooth)
+        self.loop_t = Thread(target=looper)
+        # Set BluetoothDevice on the next frame so that
+        # it does not interrupt the GUI.
+        Clock.schedule_once(lambda dt: self.find_bt_t.start(), 0.1)
 
+    def on_stop(self):
+        shutdown = True
+        # Make sure that the main thread waits for looper to finish
+        self.find_bt_t.join()
+        if loop_started:
+            self.loop_t.join()
 
-def find_bluetooth():
-    uuid="a7317d48-cf0f-4b8c-8899-c2b9184964ea"
-    print("Finding the Portahorn service at UUID: %s..." % uuid)
+# Defining main global variables
+MainApplication = PortahornApp()
+pressed_buttons = set()
+loop_started = False
+shutdown = False
+sock = None
 
-    # service_matches = find_service( uuid = uuid )
-    service_matches = discover_devices(duration=8, lookup_names=True, flush_cache=True, lookup_class=False)
-
-
-    # if len(service_matches) == 0:
-    #         print("Unable to find the Portahorn service!")
-    #         exit(0)
-
-    print("Found Portahorn service!")
-
-    return service_matches
-
-portahorn = PortahornApp()
-portahorn.run()
+if __name__ == '__main__':
+    MainApplication.run()

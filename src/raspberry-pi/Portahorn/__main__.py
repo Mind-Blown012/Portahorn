@@ -2,8 +2,7 @@ from bluetooth import *
 from gpiozero import Button
 from signal import pause
 
-button12 = Button(0)
-button1 = Button(1)
+button1 = Button(17) # Can't get pin 1 to work
 button2 = Button(2)
 button3 = Button(3)
 button4 = Button(4)
@@ -11,9 +10,6 @@ button5 = Button(5)
 button6 = Button(6)
 button7 = Button(7)
 button8 = Button(8)
-button9 = Button(9)
-button10 = Button(10)
-button11 = Button(11)
 
 sock=BluetoothSocket(RFCOMM)
 sock.bind(("",PORT_ANY))
@@ -35,12 +31,16 @@ client, info = sock.accept()
 print("Accepted connection from: {0}".format(info))
 
 def buttonPress(button):
-    if button.pin < 0 or button.pin > 11:
-        return
+    pin = button.pin.number
+    if pin == 17:
+        pin = 1
+    print("Button %d pressed", pin)
     client.send(str(button.pin)+"_1")
 def buttonRelease(button):
-    if button.pin < 0 or button.pin > 11:
-        return
+    pin = button.pin.number
+    if pin == 17:
+        pin = 1
+    print("Button %d released", pin)
     client.send(str(button.pin)+"_0")
 
 on = False
@@ -60,15 +60,8 @@ button7.when_pressed = buttonPress
 button7.when_released = buttonRelease
 button8.when_pressed = buttonPress
 button8.when_released = buttonRelease
-button9.when_pressed = buttonPress
-button9.when_released = buttonRelease
-button10.when_pressed = buttonPress
-button10.when_released = buttonRelease
-button11.when_pressed = buttonPress
-button11.when_released = buttonRelease
-button12.when_pressed = buttonPress
-button12.when_released = buttonRelease
 
+pause()
 
 client.close()
 sock.close()

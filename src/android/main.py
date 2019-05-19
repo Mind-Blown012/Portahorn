@@ -7,6 +7,7 @@ from kivy.uix.label import Label
 from kivy.properties import StringProperty
 from kivy.config import Config
 from bluetooth import *
+from kivy.graphics import Rectangle, Color
 
 
 Config.set('graphics', 'fullscreen', 0)
@@ -141,8 +142,12 @@ class mylabel(Label):
     def __init__(self, **kwargs):
         self.bind(txt=self.txt_chg)
         self.text = self.txt
-        self.font_size = 75
+        self.font_size = 175
+        self.color = (0, 0, 0, 1)
         super(mylabel, self).__init__(**kwargs)
+        with self.canvas.before:
+            Color(1, 1, 1, 1)
+            Rectangle(pos=self.pos, size=(3000, 3000))
 
     def txt_chg(self, instance, value):
         self.text = value
